@@ -75,7 +75,7 @@ export function validateWebhook(body: {
     return false;
   }
   const method = "POST";
-  const path = "/bt-lalamove-webhook";
+  const path = "/bt-lalamove-webhook-v2";
 
   if (body.apiKey !== ezyDurApiKey) {
     console.warn("Invalid API key in webhook request");
