@@ -6,7 +6,9 @@ export async function activateWebhook() {
     console.info("this is development mode");
   }
 
-  console.info("WEBHOOK ACTIVATION to", { url: process.env.WEBHOOK_URL });
+  console.info("LALAMOVE WEBHOOK ACTIVATION to", {
+    url: process.env.WEBHOOK_URL,
+  });
 
   const body = JSON.stringify({
     data: {
@@ -34,7 +36,9 @@ export async function activateWebhook() {
     const data = await response.json();
 
     if (data.errors) {
-      console.error("WEBHOOK ACTIVATION ERROR", { errors: data.errors });
+      console.error("LALAMOVE WEBHOOK ACTIVATION ERROR", {
+        errors: data.errors,
+      });
     }
 
     return data;

@@ -196,11 +196,11 @@ export const handler = async (
         message: `Webhook received: ${JSON.stringify(body)}`,
       });
 
-      console.debug("WEBHOOK BODY", { body });
+      console.debug("LALAMOVE WEBHOOK BODY", { body });
     } else {
-      console.debug("WEBHOOK: Empty body received");
+      console.debug("LALAMOVE WEBHOOK: Empty body received");
       await sendGChatMessage({
-        message: "WEBHOOK: Empty body received",
+        message: "LALAMOVE WEBHOOK: Empty body received",
       });
       return {
         statusCode: 200,
