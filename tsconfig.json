@@ -1,0 +1,25 @@
+{
+  // Visit https://aka.ms/tsconfig to read more about this file
+  "compilerOptions": {
+    "module": "es2022",
+    "moduleResolution": "bundler",
+    "target": "es2024",
+    "types": [],
+    "sourceMap": false,
+    "declaration": false,
+    "declarationMap": false,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "strict": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "noUncheckedSideEffectImports": true,
+    "moduleDetection": "force",
+    "skipLibCheck": true,
+    "outDir": "./dist",
+    "rootDir": ".",
+    "allowSyntheticDefaultImports": true
+  },
+  "include": ["index.ts"],
+  "exclude": ["node_modules", "dist"]
+}
