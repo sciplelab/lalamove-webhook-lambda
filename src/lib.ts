@@ -68,33 +68,17 @@ export function validateWebhook(body: {
   data: {};
 }) {
   const secret = process.env.SECRET;
-  const ezyDurApiKey = process.env.API_KEY;
+  const lalamoveApiKey = process.env.API_KEY;
 
-  if (!secret || !ezyDurApiKey) {
+  if (!secret || !lalamoveApiKey) {
     console.error("Missing required environment variables: SECRET and API_KEY");
     return false;
   }
   const method = "POST";
-  const path = "/bt-lalamove-webhook-v2";
+  const path = "/Prod/bt-lalamove-webhook-v2";
 
-  if (body.apiKey !== ezyDurApiKey) {
+  if (body.apiKey !== lalamoveApiKey) {
     console.warn("Invalid API key in webhook request");
-    return false;
-  }
-
-  // Timestamp validation to prevent replay attacks
-  const currentTime = Date.now();
-  const requestTime = body.timestamp * 1000; // Convert to milliseconds
-  const timeDifference = Math.abs(currentTime - requestTime);
-  const WEBHOOK_TOLERANCE_MS = 300000; // 5 minutes tolerance
-
-  if (timeDifference > WEBHOOK_TOLERANCE_MS) {
-    console.warn("Webhook timestamp validation failed:", {
-      current: currentTime,
-      request: requestTime,
-      difference: timeDifference,
-      toleranceMs: WEBHOOK_TOLERANCE_MS,
-    });
     return false;
   }
 
