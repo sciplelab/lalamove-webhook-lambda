@@ -1,5 +1,4 @@
-import "dotenv/config";
-import { getHeaders, API, API_URL } from "./lib";
+import { getHeaders, API, API_URL, fetchWithTimeout } from "./lib";
 
 export async function activateWebhook() {
   console.log(process.env.NODE_ENV);
@@ -22,11 +21,15 @@ export async function activateWebhook() {
   });
 
   try {
-    const response = await fetch(`${API_URL}${API.WEBHOOK}`, {
-      method: "PATCH",
-      body,
-      headers,
-    });
+    const response = await fetchWithTimeout(
+      `${API_URL}${API.WEBHOOK}`,
+      {
+        method: "PATCH",
+        body,
+        headers,
+      },
+      15000
+    ); // 15 second timeout for webhook registration
 
     const data = await response.json();
 
@@ -40,4 +43,4 @@ export async function activateWebhook() {
   }
 }
 
-// activateWebhook();
+activateWebhook();

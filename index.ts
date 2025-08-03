@@ -4,6 +4,7 @@ import {
   API,
   API_URL,
   sendGChatMessage,
+  fetchWithTimeout,
 } from "./lib";
 import { executeQuery } from "./db";
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
@@ -81,10 +82,14 @@ async function fetchOrderDetails(
       body: "",
     });
 
-    const response = await fetch(`${API_URL}${path}`, {
-      method: "GET",
-      headers,
-    });
+    const response = await fetchWithTimeout(
+      `${API_URL}${path}`,
+      {
+        method: "GET",
+        headers,
+      },
+      15000
+    ); // 15 second timeout for Lalamove API
 
     if (!response.ok) {
       console.error(
@@ -194,6 +199,9 @@ export const handler = async (
       console.debug("WEBHOOK BODY", { body });
     } else {
       console.debug("WEBHOOK: Empty body received");
+      await sendGChatMessage({
+        message: "WEBHOOK: Empty body received",
+      });
       return {
         statusCode: 200,
         body: JSON.stringify({ message: "Post webhook activation data" }),
@@ -247,10 +255,17 @@ export const handler = async (
         }
       } catch (error) {
         console.error(`Error processing completed order ${orderId}:`, error);
+
+        // Handle timeout errors specifically
+        const errorMessage =
+          error instanceof Error && error.message.includes("timeout")
+            ? "Request timeout while processing order"
+            : "Error processing completed order";
+
         return {
           statusCode: 500,
           body: JSON.stringify({
-            error: "Error processing completed order",
+            error: errorMessage,
             orderId: orderId,
           }),
         };
