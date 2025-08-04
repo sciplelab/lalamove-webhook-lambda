@@ -1,4 +1,5 @@
-import { getHeaders, API, API_URL, fetchWithTimeout } from "./lib";
+import { getHeaders, API, API_URL } from "./lib";
+import axios from "axios";
 
 export async function activateWebhook() {
   console.log(process.env.NODE_ENV);
@@ -20,20 +21,17 @@ export async function activateWebhook() {
     method: "PATCH",
     path: API.WEBHOOK,
     body,
+    market: "MY",
   });
 
   try {
-    const response = await fetchWithTimeout(
-      `${API_URL}${API.WEBHOOK}`,
-      {
-        method: "PATCH",
-        body,
-        headers,
-      },
-      15000
-    ); // 15 second timeout for webhook registration
+    const response = await axios(`${API_URL}${API.WEBHOOK}`, {
+      method: "PATCH",
+      data: body,
+      headers: Object.fromEntries(headers),
+    });
 
-    const data = await response.json();
+    const data = await response.data;
 
     if (data.errors) {
       console.error("LALAMOVE WEBHOOK ACTIVATION ERROR", {

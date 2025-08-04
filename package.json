@@ -5,21 +5,32 @@
   "main": "index.js",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "compile": "esbuild src/index.ts --bundle --platform=node --target=node18 --format=cjs --outfile=dist/index.js --external:aws-sdk --minify --tree-shaking=true",
-    "lambda:deploy": "npm run compile && cd dist && zip -r ../lambda.zip * && cd .. && aws lambda update-function-code --function-name bt-lalamove-webhook-v2 --zip-file fileb://./lambda.zip"
+    "compile": "pnpm run compile:receiver && npm run compile:processor",
+    "compile:receiver": "esbuild src/index.ts --bundle --platform=node --target=node18 --format=cjs --outfile=dist/receiver/index.js --external:aws-sdk --minify --tree-shaking=true",
+    "compile:processor": "esbuild src/webhook-processor.ts --bundle --platform=node --target=node18 --format=cjs --outfile=dist/processor/index.js --external:aws-sdk --minify --tree-shaking=true",
+    "deploy:receiver": "pnpm run compile:receiver && cd dist/receiver && zip -r ../lambda.zip index.js && cd .. && aws lambda update-function-code --function-name bt-lalamove-webhook-v2 --zip-file fileb://./lambda.zip",
+    "deploy:processor": "pnpm run compile:processor && cd dist/processor && zip -r ../lambda.zip index.js && cd .. && aws lambda update-function-code --function-name bt-lalamove-webhook-processor --zip-file fileb://./lambda.zip"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.13.1",
   "devDependencies": {
+    "@aws-cdk/aws-apigatewayv2-alpha": "2.114.1-alpha.0",
+    "@aws-cdk/aws-apigatewayv2-integrations-alpha": "2.114.1-alpha.0",
+    "@aws-sdk/client-sqs": "^3.859.0",
     "@types/aws-lambda": "^8.10.145",
     "@types/mssql": "^9.1.7",
     "@types/node": "^24.1.0",
+    "aws-cdk-lib": "^2.208.0",
+    "constructs": "^10.4.2",
     "esbuild": "^0.25.8",
+    "source-map-support": "^0.5.21",
+    "ts-node": "^10.9.2",
     "typescript": "^5.9.2"
   },
   "dependencies": {
+    "axios": "^1.11.0",
     "mssql": "^11.0.1"
   }
 }

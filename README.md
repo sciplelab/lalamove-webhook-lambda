@@ -1,16 +1,57 @@
-# Lalamove Webhook Lambda Function
+# Lalamove Webhook Service
 
-A TypeScript Lambda function to handle Lalamove webhook events, specifically designed for processing order status changes and fetching order details when orders are completed.
+A TypeScript AWS Lambda service for handling Lalamove webhook events with background processing using SQS.
+
+## Quick Start
+
+1. **Install dependencies**:
+   ```bash
+   pnpm install
+   ```
+
+2. **Set environment variables** (create `.env` or set in AWS):
+   ```bash
+   export API_KEY="your-lalamove-api-key"
+   export SECRET="your-webhook-secret"
+   export MSSQL_DB_HOST="your-db-host"
+   export MSSQL_DB_NAME="your-db-name"
+   export MSSQL_DB_USER="your-db-user"
+   export MSSQL_DB_PASSWORD="your-db-password"
+   ```
+
+3. **Deploy infrastructure**:
+   ```bash
+   npm run cdk:deploy
+   ```
+
+4. **Get webhook URL** from CDK output and configure in Lalamove dashboard.
+
+## Architecture
+
+The service uses a two-Lambda architecture with SQS for background processing:
+
+```
+Webhook → API Gateway → Receiver Lambda → SQS → Processor Lambda → Database
+                            ↓
+                      Immediate 200 Response
+```
+
+- **Receiver**: Validates signatures, queues messages, responds immediately
+- **Processor**: Fetches order details, updates database in background
+- **SQS**: Reliable message queue with dead letter queue for failures
 
 ## Features
 
+- ✅ Immediate webhook response (< 1 second)
+- ✅ Background processing with SQS
 - ✅ Webhook signature validation using HMAC-SHA256
 - ✅ Handles `ORDER_STATUS_CHANGED` events
 - ✅ Automatically fetches order details when status is `COMPLETED`
 - ✅ Updates database with order and delivery stop information
+- ✅ Dead letter queue for failed messages
 - ✅ Full TypeScript support with proper types
+- ✅ Infrastructure as Code with AWS CDK
 - ✅ Error handling and logging
-- ✅ AWS Lambda optimized
 
 ## Environment Variables
 
@@ -96,36 +137,32 @@ The function expects webhook payloads in this format:
 - `FAILED` - Logged but no additional processing
 - `CANCELLED` - Logged but no additional processing
 
-## Build and Deploy
+## Development
 
 ```bash
-# Install dependencies
-pnpm install
-
 # Type check
 npm run typecheck
 
-# Build for Lambda (CommonJS)
-npm run build
-
-# Build as ESM (if needed)
-npm run build:esm
-
-# Compile only index.ts with tsc (new)
+# Build functions
 npm run compile
+
+# Deploy changes
+npm run cdk:deploy
+
+# View changes
+npm run cdk:diff
+
+# Destroy infrastructure
+npm run cdk:destroy
 ```
 
-The built function will be in `dist/index.js` ready for Lambda deployment.
+## Monitoring
 
-## TypeScript Compilation
+- Check CloudWatch logs for both Lambda functions
+- Monitor SQS queue metrics and dead letter queue
+- Database update success/failure notifications via Google Chat
 
-To compile only index.ts with TypeScript compiler:
-
-```bash
-npm run compile
-```
-
-This will compile index.ts and any imported modules to the dist folder according to the tsconfig.json configuration. The tsconfig.json has been configured to include only index.ts and its dependencies, excluding other files in the project. The output uses ES modules for better compatibility with modern Node.js environments like AWS Lambda.
+For detailed configuration and troubleshooting, see [CLAUDE.md](./CLAUDE.md).
 
 ## API Endpoints Used
 

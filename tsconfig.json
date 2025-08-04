@@ -20,6 +20,6 @@
     "rootDir": ".",
     "allowSyntheticDefaultImports": true
   },
-  "include": ["src/index.ts"],
+  "include": ["src/**/*", "infrastructure/**/*"],
   "exclude": ["node_modules", "dist"]
 }

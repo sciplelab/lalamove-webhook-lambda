@@ -1,40 +1,59 @@
 import { createHmac } from "node:crypto";
+import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
 
-// Enhanced fetch with timeout and error handling
-export async function fetchWithTimeout(
-  url: string,
-  options: RequestInit = {},
-  timeoutMs: number = 30000
-): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-  }, timeoutMs);
-
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-    return response;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error(`Request timeout after ${timeoutMs}ms`);
-    }
-    throw error;
-  }
+export type lalamoveWebhookEvents = "ORDER_STATUS_CHANGED";
+export type lalamoveOrderStatus = "COMPLETED" | "CANCELLED";
+export type lalamoveStopStatus = "PENDING" | "DELIVERED" | "FAILED";
+interface LalamoveWebhookPayload {
+  apiKey: string;
+  timestamp: number;
+  signature: string;
+  eventType: lalamoveWebhookEvents;
+  data: {
+    updatedAt: string;
+    order: {
+      orderId: string;
+      status: lalamoveOrderStatus;
+    };
+  };
 }
+
+interface OrderProcessingMessage {
+  orderId: string;
+  status: lalamoveOrderStatus;
+  timestamp: number;
+  webhookData: LalamoveWebhookPayload;
+  eventType: lalamoveWebhookEvents;
+}
+
+export const API = {
+  QUOTATION: "/v3/quotations",
+  QUOTATION_DETAILS: "/v3/quotations/:quotationId",
+  PLACE_ORDER: "/v3/orders",
+  ORDER_DETAILS: "/v3/orders/:orderId",
+  DRIVER_DETAILS: "/v3/orders/:orderId/drivers/:driverId",
+  WEBHOOK: "/v3/webhook",
+  CANCEL_ORDER: "/v3/orders/:orderId",
+  CITY_INFO: "/v3/cities",
+};
+
+export const API_URL =
+  process.env.NODE_ENV === "production"
+    ? "https://rest.lalamove.com"
+    : "https://rest.sandbox.lalamove.com";
+
+const GCHAT_API = process.env.GCHAT_API;
 
 export function getHeaders({
   method,
   path,
   body,
+  market = "MY",
 }: {
   method: string;
   path: string;
   body: string;
+  market?: string;
 }): Headers {
   const secret = process.env.SECRET;
   const apiKey = process.env.API_KEY;
@@ -56,7 +75,7 @@ export function getHeaders({
   const headers = new Headers();
   headers.append("Content-Type", "application/json");
   headers.append("Authorization", `hmac ${token}`);
-  headers.append("Market", "MY");
+  headers.append("Market", market);
 
   return headers;
 }
@@ -92,52 +111,32 @@ export function validateWebhook(body: {
   return signature === body.signature;
 }
 
-export const API = {
-  QUOTATION: "/v3/quotations",
-  QUOTATION_DETAILS: "/v3/quotations/:quotationId",
-  PLACE_ORDER: "/v3/orders",
-  ORDER_DETAILS: "/v3/orders/:orderId",
-  DRIVER_DETAILS: "/v3/orders/:orderId/drivers/:driverId",
-  WEBHOOK: "/v3/webhook",
-  CANCEL_ORDER: "/v3/orders/:orderId",
-  CITY_INFO: "/v3/cities",
-};
-
-export const API_URL =
-  process.env.NODE_ENV === "production"
-    ? "https://rest.lalamove.com"
-    : "https://rest.sandbox.lalamove.com";
-
-const GCHAT_API = process.env.GCHAT_API;
-
-export const sendGChatMessage = async ({ message }: { message: string }) => {
+export const sendGChatMessage = async ({
+  message,
+}: {
+  message: string;
+}): Promise<void> => {
   if (!GCHAT_API) {
     console.warn({
       message: "webhook URL not configured",
       function: "sendGChatMessage",
     });
-    return { warning: "Webhook URL not configured" };
+    return;
   }
 
-  const chatRes = await fetchWithTimeout(
-    GCHAT_API,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json; charset=UTF-8" },
-      body: JSON.stringify({
-        text: `${getGMT8Time()} ${message}`,
-      }),
-    },
-    10000
-  ); // 10 second timeout for Google Chat
-  const chatResult = await chatRes.json();
-
-  console.info({
-    message: "Gchat message sent",
-    function: "sendGChatMessage",
+  const response = await fetch(GCHAT_API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json; charset=UTF-8" },
+    body: JSON.stringify({
+      text: `${getGMT8Time()} ${message}`,
+    }),
   });
 
-  return chatResult;
+  if (!response.ok) {
+    console.error(`Failed to send message to GChat: ${response.statusText}`);
+  }
+
+  console.log("Message sent to GChat:", message);
 };
 
 export const getGMT8Time = () => {
@@ -152,3 +151,56 @@ export const getGMT8Time = () => {
     second: "2-digit",
   });
 };
+
+const sqs = new SQSClient({
+  region: "ap-southeast-1",
+});
+
+export async function queueOrderForProcessing({
+  orderId,
+  status,
+  webhookData,
+}: {
+  orderId: string;
+  status: lalamoveOrderStatus;
+  webhookData: LalamoveWebhookPayload;
+}): Promise<boolean> {
+  try {
+    const message: OrderProcessingMessage = {
+      orderId,
+      status,
+      eventType: webhookData.eventType,
+      timestamp: Date.now(),
+      webhookData,
+    };
+
+    const command = new SendMessageCommand({
+      QueueUrl: process.env.ORDER_PROCESSING_QUEUE_URL!,
+      MessageBody: JSON.stringify(message),
+      MessageAttributes: {
+        orderId: {
+          DataType: "String",
+          StringValue: orderId,
+        },
+        status: {
+          DataType: "String",
+          StringValue: status,
+        },
+        eventType: {
+          DataType: "String",
+          StringValue: webhookData.eventType,
+        },
+      },
+    });
+
+    const result = await sqs.send(command);
+    console.log(
+      `Successfully queued order ${orderId} for processing:`,
+      result.MessageId
+    );
+    return true;
+  } catch (error) {
+    console.error(`Failed to queue order ${orderId} for processing:`, error);
+    return false;
+  }
+}
